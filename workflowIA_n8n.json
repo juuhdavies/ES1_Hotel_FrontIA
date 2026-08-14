@@ -1,0 +1,408 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ia_hotel",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        1888,
+        96
+      ],
+      "id": "a5801960-d639-4732-bd80-807af2c5df2b",
+      "name": "Webhook",
+      "webhookId": "8002aef0-6559-42b8-9b3e-289c1ce0738a"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.body.mensagem }}",
+        "options": {
+          "systemMessage": "Você é a IA do Hotel Elfsong. Use somente as ferramentas disponíveis, confirme operações de escrita e respeite as autorizações da API."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        2192,
+        96
+      ],
+      "id": "10ce14d1-89d2-4634-a66d-03a3ea757711",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.5-flash-lite",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        2064,
+        304
+      ],
+      "id": "c08a2710-506a-434b-b662-b9c946b24f33",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "Az0Pa8BRT3C8BrXY",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ resposta: $json.output, sessao_id: $node['Webhook'].json.body.sessao_id }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2736,
+        96
+      ],
+      "id": "c0e7287d-bec7-462b-b6ae-5c34fc385859",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Utilize esta ferramenta quando o usuário solicitar detalhes, status, valor ou datas de uma reserva específica e fornecer o código/ID numérico da reserva. Exemplo: 'Quero ver os dados da reserva 1042'.",
+        "url": "=http://host.docker.internal:3000/api/v1/reservas/{{ $fromAI('id_reserva', 'ID numérico da reserva', 'string') }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.5,
+      "position": [
+        2672,
+        288
+      ],
+      "id": "44e35c4d-7a76-484b-985c-ff0e87421e54",
+      "name": "consultar_detalhes_reserva"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Utilize esta ferramenta quando o usuário quiser saber quais tipos de quartos estão disponíveis para reserva, valores de diárias, tipos de acomodação ou opções de hospedagem.",
+        "url": "=http://host.docker.internal:3000/api/v1/tipos_quarto",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": []
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.5,
+      "position": [
+        2496,
+        288
+      ],
+      "id": "4408bda2-bff8-4be6-8bca-388d3fcacc8a",
+      "name": "consultar_quartos_disponíveis"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Utilize esta ferramenta para listar o histórico ou verificar reservas de um cliente quando informado o ID do cliente.",
+        "url": "=http://host.docker.internal:3000/api/v1/clientes/{{ $fromAI('idCliente', 'ID numérico do cliente', 'string') }}/reservas",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.5,
+      "position": [
+        2880,
+        304
+      ],
+      "id": "780dca1b-9a20-4721-a5f1-bcd37ff75bee",
+      "name": "consultar_historico_hospede"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Utilize esta ferramenta para realizar/confirmar o agendamento de uma nova reserva no sistema. Requer: idCliente, idTipoQuarto, data_checkin, data_checkout, qnt_adultos, qnt_criancas, cafe_manha.",
+        "method": "POST",
+        "url": "=http://host.docker.internal:3000/api/v1/reservas",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"idCliente\": \"{{ $fromAI('idCliente', 'ID do cliente', 'string') }}\",\n  \"idTipoQuarto\": \"{{ $fromAI('idTipoQuarto', 'ID do tipo de quarto', 'string') }}\",\n  \"data_checkin\": \"{{ $fromAI('data_checkin', 'Data de check-in YYYY-MM-DD', 'string') }}\",\n  \"data_checkout\": \"{{ $fromAI('data_checkout', 'Data de check-out YYYY-MM-DD', 'string') }}\",\n  \"qnt_adultos\": {{ $fromAI('qnt_adultos', 'Número de adultos', 'number') }},\n  \"qnt_criancas\": {{ $fromAI('qnt_criancas', 'Número de crianças', 'number') }},\n  \"cafe_manha\": {{ $fromAI('cafe_manha', 'Booleano true/false se inclui café', 'boolean') }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.5,
+      "position": [
+        2496,
+        512
+      ],
+      "id": "22095c54-680a-49e1-aa7f-c149c1d8ea23",
+      "name": "criar_nova_reserva"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Utilize esta ferramenta para cancelar uma reserva existente informando o ID da reserva.",
+        "method": "PUT",
+        "url": "=http://host.docker.internal:3000/api/v1/reservas/{{ $fromAI('id_reserva', 'ID da reserva', 'string') }}/cancelar",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.5,
+      "position": [
+        2704,
+        512
+      ],
+      "id": "35a1d6e4-beab-4a60-9174-aa1c77d7e28e",
+      "name": "cancelar_reserva"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Use somente para um gerente consultar o faturamento de hospedagem e salas em um intervalo de datas (data_inicio e data_fim YYYY-MM-DD).",
+        "url": "=http://host.docker.internal:3000/api/v1/faturamento",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "data_inicio",
+              "value": "={{ $fromAI('data_inicio', 'Data inicial YYYY-MM-DD', 'string') }}"
+            },
+            {
+              "name": "data_fim",
+              "value": "={{ $fromAI('data_fim', 'Data final YYYY-MM-DD', 'string') }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.5,
+      "position": [
+        2928,
+        512
+      ],
+      "id": "608d141a-dc7f-40ae-951b-08ce7b8c3cae",
+      "name": "consultar_faturamento"
+    },
+    {
+      "parameters": {
+        "toolDescription": "Use somente para um gerente cadastrar um novo tipo de quarto.",
+        "method": "POST",
+        "url": "=http://host.docker.internal:3000/api/v1/tipos_quarto",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"nome_tipoQuarto\": \"{{ $fromAI('nome_tipoQuarto', 'Nome do tipo de quarto', 'string') }}\",\n  \"valor_base\": {{ $fromAI('valor_base', 'Valor base da diária', 'number') }},\n  \"limite_adultos\": {{ $fromAI('limite_adultos', 'Limite de adultos', 'number') }},\n  \"limite_criancas\": {{ $fromAI('limite_criancas', 'Limite de crianças', 'number') }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.5,
+      "position": [
+        3104,
+        512
+      ],
+      "id": "4c59bb8f-909e-45c5-8af9-aff128338215",
+      "name": "cadastrar_tipo_quarto"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.body.sessao_id }}",
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        2208,
+        304
+      ],
+      "id": "6dcd8347-1c6d-443f-b9da-06b7ba623aa9",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $input.first().json;\nreturn [{ json: { output: payload.output || payload.text || payload } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2560,
+        96
+      ],
+      "id": "04842517-3468-467b-a0fb-3423e73d82c9",
+      "name": "Code in JavaScript"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "consultar_detalhes_reserva": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "consultar_quartos_disponíveis": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "consultar_historico_hospede": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "criar_nova_reserva": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "cancelar_reserva": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "consultar_faturamento": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "cadastrar_tipo_quarto": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "881cbfa4-f9ec-4045-a3de-fcfc1b46fc0a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d1616fffaa1c2b6c7219924fca9638ef5461127ecb48a455489782d07a122122"
+  },
+  "nodeGroups": [],
+  "id": "NpbiATJFUd6p32GS",
+  "tags": []
+}
